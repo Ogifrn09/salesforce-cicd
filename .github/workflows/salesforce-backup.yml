@@ -1,0 +1,45 @@
+name: Salesforce Metadata Backup
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to Salesforce
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias backup-org
+
+      - name: Retrieve metadata
+        run: |
+          sf project retrieve start \
+            --manifest manifest/package.xml \
+            --target-org backup-org
+
+      - name: Commit backup changes
+        run: |
+          git config user.name "salesforce-backup-bot"
+          git config user.email "salesforce-backup-bot@users.noreply.github.com"
+          git add force-app manifest sfdx-project.json
+          if git diff --cached --quiet; then
+            echo "No metadata changes to back up."
+          else
+            git commit -m "Scheduled Salesforce metadata backup"
+            git push
+          fi

@@ -53,3 +53,18 @@ jobs:
             --sobject Pricebook2 \
             --file "${backup_file}" \
             --external-id Id
+
+      - name: Restore PricebookEntry
+        run: |
+          backup_file="backups/data/${{ inputs.backup_date }}/PricebookEntry.csv"
+
+          if [ ! -f "${backup_file}" ]; then
+            echo "Backup file not found: ${backup_file}"
+            exit 1
+          fi
+
+          sf data upsert bulk \
+            --target-org restore-org \
+            --sobject PricebookEntry \
+            --file "${backup_file}" \
+            --external-id Id

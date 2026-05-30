@@ -56,3 +56,9 @@ jobs:
             --target-org health-org \
             --query "SELECT Id, Name, ProductCode FROM Product2 WHERE IsActive = true AND Id NOT IN (SELECT Product2Id FROM PricebookEntry WHERE IsActive = true) LIMIT 50" \
             | tee -a reports/product-health.md
+
+      - name: Upload product health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-health-report
+          path: reports/product-health.md

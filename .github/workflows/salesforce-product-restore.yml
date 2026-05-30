@@ -1,0 +1,40 @@
+name: Salesforce Product Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_date:
+        description: "Backup date folder to restore, for example 2026-05-31"
+        required: true
+        type: string
+
+jobs:
+  restore-product:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to Salesforce
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias restore-org
+
+      - name: Restore Product2
+        run: |
+          backup_file="backups/data/${{ inputs.backup_date }}/Product2.csv"
+
+          if [ ! -f "${backup_file}" ]; then
+            echo "Backup file not found: ${backup_file}"
+            exit 1
+          fi
+
+          sf data upsert bulk \
+            --target-org restore-org \
+            --sobject Product2 \
+            --file "${backup_file}" \
+            --external-id Id

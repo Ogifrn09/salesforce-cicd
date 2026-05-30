@@ -57,7 +57,31 @@ jobs:
             --query "SELECT Id, Name, ProductCode FROM Product2 WHERE IsActive = true AND Id NOT IN (SELECT Product2Id FROM PricebookEntry WHERE IsActive = true) LIMIT 50" \
             | tee -a reports/product-health.md
 
+      - name: Validate product health rules
+        run: |
+          sf data query \
+            --target-org health-org \
+            --query "SELECT Id FROM Product2 WHERE IsActive = true AND ProductCode = null LIMIT 1" \
+            --json > missing-product-code.json
+
+          sf data query \
+            --target-org health-org \
+            --query "SELECT Id FROM Product2 WHERE IsActive = true AND Id NOT IN (SELECT Product2Id FROM PricebookEntry WHERE IsActive = true) LIMIT 1" \
+            --json > missing-pricebook-entry.json
+
+          missing_product_code="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('missing-product-code.json','utf8')); console.log(data.result.totalSize || 0)")"
+          missing_pricebook_entry="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('missing-pricebook-entry.json','utf8')); console.log(data.result.totalSize || 0)")"
+
+          echo "Missing product code count: ${missing_product_code}"
+          echo "Missing active pricebook entry count: ${missing_pricebook_entry}"
+
+          if [ "${missing_product_code}" -gt 0 ] || [ "${missing_pricebook_entry}" -gt 0 ]; then
+            echo "Product health validation failed. Download product-health-report for details."
+            exit 1
+          fi
+
       - name: Upload product health report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: product-health-report

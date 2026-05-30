@@ -1,0 +1,30 @@
+name: Salesforce Validate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to Salesforce
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias ci-org
+
+      - name: Validate deployment
+        run: |
+          sf project deploy validate \
+            --manifest manifest/package.xml \
+            --target-org ci-org \
+            --test-level NoTestRun

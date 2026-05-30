@@ -1,0 +1,57 @@
+name: Salesforce Data Backup
+
+on:
+  schedule:
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to Salesforce
+        run: |
+          echo "${{ secrets.SF_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias data-backup-org
+
+      - name: Export configured objects
+        run: |
+          backup_date="$(date -u +'%Y-%m-%d')"
+          backup_dir="backups/data/${backup_date}"
+          mkdir -p "${backup_dir}"
+
+          while IFS='|' read -r file_name soql; do
+            if [ -z "${file_name}" ] || [[ "${file_name}" == \#* ]]; then
+              continue
+            fi
+
+            echo "Backing up ${file_name}"
+            sf data query \
+              --target-org data-backup-org \
+              --query "${soql}" \
+              --result-format csv > "${backup_dir}/${file_name}.csv"
+          done < config/data-backup-queries.txt
+
+      - name: Commit data backup changes
+        run: |
+          git config user.name "salesforce-backup-bot"
+          git config user.email "salesforce-backup-bot@users.noreply.github.com"
+          git add backups/data config/data-backup-queries.txt
+          if git diff --cached --quiet; then
+            echo "No data changes to back up."
+          else
+            git commit -m "Scheduled Salesforce data backup"
+            git push
+          fi

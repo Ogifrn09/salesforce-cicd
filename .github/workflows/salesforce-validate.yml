@@ -24,7 +24,8 @@ jobs:
 
       - name: Validate deployment
         run: |
-          sf project deploy validate \
+          sf project deploy start \
+            --dry-run \
             --manifest manifest/deploy-package.xml \
             --target-org ci-org \
             --test-level NoTestRun

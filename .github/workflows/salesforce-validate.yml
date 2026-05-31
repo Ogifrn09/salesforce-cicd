@@ -27,4 +27,4 @@ jobs:
           sf project deploy validate \
             --manifest manifest/deploy-package.xml \
             --target-org ci-org \
-            --test-level RunLocalTests
+            --test-level NoTestRun

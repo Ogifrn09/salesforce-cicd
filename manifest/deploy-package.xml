@@ -3,6 +3,7 @@
     <types>
         <members>Product2.Product_Health_Status__c</members>
         <members>Product2.Deployment_Batch__c</members>
+        <members>Product2.Product_Release_Notes__c</members>
         <name>CustomField</name>
     </types>
     <version>60.0</version>

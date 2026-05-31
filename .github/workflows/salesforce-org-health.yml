@@ -101,6 +101,10 @@ jobs:
           sf data query --target-org health-org --query "SELECT QualifiedApiName, DataType, Label FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Account' AND QualifiedApiName LIKE '%Priority%'" | tee -a reports/org-health-report.md
           echo "" | tee -a reports/org-health-report.md
 
+      - name: Create Excel org health report
+        if: always()
+        run: python3 scripts/create_org_health_excel_report.py
+
       - name: Upload org health report
         if: always()
         uses: actions/upload-artifact@v4

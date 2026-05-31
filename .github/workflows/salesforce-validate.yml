@@ -25,6 +25,6 @@ jobs:
       - name: Validate deployment
         run: |
           sf project deploy validate \
-            --manifest manifest/package.xml \
+            --manifest manifest/deploy-package.xml \
             --target-org ci-org \
             --test-level RunLocalTests

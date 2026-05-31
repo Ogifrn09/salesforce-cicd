@@ -1,0 +1,98 @@
+name: Salesforce Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_rollback:
+        description: "Type ROLLBACK to delete Product_Release_Notes__c from dummy prod"
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm_rollback }}" != "ROLLBACK" ]; then
+            echo "Rollback cancelled. Type ROLLBACK to confirm."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to dummy prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias prod-org
+
+      - name: Prepare rollback report
+        run: |
+          mkdir -p reports
+          echo "## Salesforce Rollback Report" > reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+          echo "Target org: dummy prod" >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+          echo "### Destructive Changes" >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+          echo '```xml' >> reports/rollback-report.md
+          cat manifest/destructiveChanges.xml >> reports/rollback-report.md
+          echo '```' >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+
+      - name: Rollback metadata package
+        run: |
+          sf project deploy start \
+            --manifest manifest/package-empty.xml \
+            --post-destructive-changes manifest/destructiveChanges.xml \
+            --target-org prod-org \
+            --test-level NoTestRun \
+            --json > reports/rollback-result.json
+
+      - name: Verify rollback
+        if: always()
+        run: |
+          sf data query \
+            --target-org prod-org \
+            --query "SELECT QualifiedApiName, DataType, Label FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Product2' AND QualifiedApiName = 'Product_Release_Notes__c'" \
+            --json > reports/post-rollback-verification.json
+
+      - name: Add rollback result to report
+        if: always()
+        run: |
+          echo "### Rollback Result" >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+
+          if [ -f reports/rollback-result.json ]; then
+            echo '```json' >> reports/rollback-report.md
+            cat reports/rollback-result.json >> reports/rollback-report.md
+            echo '```' >> reports/rollback-report.md
+          else
+            echo "Rollback result file was not created." >> reports/rollback-report.md
+          fi
+
+          echo "" >> reports/rollback-report.md
+          echo "### Post-Rollback Verification" >> reports/rollback-report.md
+          echo "" >> reports/rollback-report.md
+
+          if [ -f reports/post-rollback-verification.json ]; then
+            echo '```json' >> reports/rollback-report.md
+            cat reports/post-rollback-verification.json >> reports/rollback-report.md
+            echo '```' >> reports/rollback-report.md
+          else
+            echo "Post-rollback verification file was not created." >> reports/rollback-report.md
+          fi
+
+      - name: Upload rollback report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-report
+          path: reports/

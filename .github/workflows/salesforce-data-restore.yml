@@ -1,0 +1,110 @@
+name: Salesforce Manual Data Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_date:
+        description: "Backup date folder, for example 2026-05-31"
+        required: true
+        type: string
+      sobject_name:
+        description: "Salesforce object API name, for example Product2, Account, Opportunity"
+        required: true
+        type: string
+      csv_file:
+        description: "CSV file name inside backups/data/<date>, for example Product2.csv"
+        required: true
+        type: string
+      external_id:
+        description: "External ID field for upsert. Use Id only for restoring to the same org."
+        required: true
+        default: "Id"
+        type: string
+      confirm_restore:
+        description: "Type RESTORE to restore data to dummy prod"
+        required: true
+        type: string
+
+jobs:
+  restore-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm_restore }}" != "RESTORE" ]; then
+            echo "Data restore cancelled. Type RESTORE to confirm."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to dummy prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias restore-org
+
+      - name: Validate restore file
+        run: |
+          restore_file="backups/data/${{ inputs.backup_date }}/${{ inputs.csv_file }}"
+
+          if [ ! -f "${restore_file}" ]; then
+            echo "Restore file not found: ${restore_file}"
+            exit 1
+          fi
+
+          echo "Restore file found: ${restore_file}"
+          echo "Target object: ${{ inputs.sobject_name }}"
+          echo "External ID: ${{ inputs.external_id }}"
+          echo "Preview:"
+          head -n 5 "${restore_file}"
+
+      - name: Prepare restore report
+        run: |
+          mkdir -p reports
+          echo "## Salesforce Data Restore Report" > reports/data-restore-report.md
+          echo "" >> reports/data-restore-report.md
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> reports/data-restore-report.md
+          echo "" >> reports/data-restore-report.md
+          echo "Target org: dummy prod" >> reports/data-restore-report.md
+          echo "Backup date: ${{ inputs.backup_date }}" >> reports/data-restore-report.md
+          echo "Object: ${{ inputs.sobject_name }}" >> reports/data-restore-report.md
+          echo "CSV file: ${{ inputs.csv_file }}" >> reports/data-restore-report.md
+          echo "External ID: ${{ inputs.external_id }}" >> reports/data-restore-report.md
+          echo "" >> reports/data-restore-report.md
+
+      - name: Restore data
+        run: |
+          restore_file="backups/data/${{ inputs.backup_date }}/${{ inputs.csv_file }}"
+
+          sf data upsert bulk \
+            --target-org restore-org \
+            --sobject "${{ inputs.sobject_name }}" \
+            --file "${restore_file}" \
+            --external-id "${{ inputs.external_id }}" \
+            --json > reports/data-restore-result.json
+
+      - name: Add restore result to report
+        if: always()
+        run: |
+          echo "### Restore Result" >> reports/data-restore-report.md
+          echo "" >> reports/data-restore-report.md
+
+          if [ -f reports/data-restore-result.json ]; then
+            echo '```json' >> reports/data-restore-report.md
+            cat reports/data-restore-result.json >> reports/data-restore-report.md
+            echo '```' >> reports/data-restore-report.md
+          else
+            echo "Data restore result file was not created." >> reports/data-restore-report.md
+          fi
+
+      - name: Upload data restore report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-restore-report
+          path: reports/

@@ -1,0 +1,39 @@
+name: Salesforce Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Type DEPLOY to deploy the metadata package to dummy prod"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm_deploy }}" != "DEPLOY" ]; then
+            echo "Deployment cancelled. Type DEPLOY to confirm."
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to dummy prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias prod-org
+
+      - name: Deploy metadata package
+        run: |
+          sf project deploy start \
+            --manifest manifest/deploy-package.xml \
+            --target-org prod-org \
+            --test-level NoTestRun

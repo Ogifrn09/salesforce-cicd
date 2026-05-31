@@ -57,6 +57,13 @@ jobs:
             --test-level NoTestRun \
             --json > reports/deploy-result.json
 
+      - name: Verify deployed metadata
+        run: |
+          sf data query \
+            --target-org prod-org \
+            --query "SELECT QualifiedApiName, DataType, Label FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Product2' AND QualifiedApiName = 'Product_Health_Status__c'" \
+            --json > reports/post-deploy-verification.json
+
       - name: Add deploy result to report
         if: always()
         run: |
@@ -70,6 +77,22 @@ jobs:
           else
             echo "Deploy result file was not created." >> reports/deploy-report.md
           fi
+
+          echo "" >> reports/deploy-report.md
+          echo "### Post-Deploy Verification" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+
+          if [ -f reports/post-deploy-verification.json ]; then
+            echo '```json' >> reports/deploy-report.md
+            cat reports/post-deploy-verification.json >> reports/deploy-report.md
+            echo '```' >> reports/deploy-report.md
+          else
+            echo "Post-deploy verification file was not created." >> reports/deploy-report.md
+          fi
+
+      - name: Create Excel deploy report
+        if: always()
+        run: python3 scripts/create_deploy_excel_report.py
 
       - name: Upload deploy report
         if: always()

@@ -19,7 +19,7 @@ jobs:
 
       - name: Auth to Salesforce
         run: |
-          echo "${{ secrets.SF_AUTH_URL }}" > ./sf-auth-url.txt
+          echo "${{ secrets.SF_DEV_AUTH_URL }}" > ./sf-auth-url.txt
           sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias ci-org
 
       - name: Validate deployment

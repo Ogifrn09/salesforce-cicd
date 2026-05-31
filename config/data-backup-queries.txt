@@ -3,6 +3,10 @@
 Account|SELECT Id, Name, Type, Industry, Phone, Website, CreatedDate, LastModifiedDate FROM Account
 Contact|SELECT Id, FirstName, LastName, Email, Phone, AccountId, CreatedDate, LastModifiedDate FROM Contact
 Opportunity|SELECT Id, Name, StageName, Amount, CloseDate, AccountId, CreatedDate, LastModifiedDate FROM Opportunity
+Quote|SELECT Id, Name, QuoteNumber, OpportunityId, AccountId, Status, GrandTotal, CreatedDate, LastModifiedDate FROM Quote
+Order|SELECT Id, OrderNumber, AccountId, OpportunityId, Status, EffectiveDate, EndDate, TotalAmount, CreatedDate, LastModifiedDate FROM Order
+Contract|SELECT Id, ContractNumber, AccountId, Status, StartDate, EndDate, ContractTerm, CreatedDate, LastModifiedDate FROM Contract
+Asset|SELECT Id, Name, AccountId, ContactId, Product2Id, SerialNumber, Status, InstallDate, PurchaseDate, CreatedDate, LastModifiedDate FROM Asset
 Product2|SELECT Id, Name, ProductCode, Description, Family, IsActive, CreatedDate, LastModifiedDate FROM Product2
 Pricebook2|SELECT Id, Name, IsActive, IsStandard, Description, CreatedDate, LastModifiedDate FROM Pricebook2
 PricebookEntry|SELECT Id, Product2Id, Pricebook2Id, UnitPrice, IsActive, UseStandardPrice, CreatedDate, LastModifiedDate FROM PricebookEntry

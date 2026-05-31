@@ -1,0 +1,119 @@
+name: Salesforce Org Health
+
+on:
+  schedule:
+    - cron: "30 19 * * *"
+  workflow_dispatch:
+
+jobs:
+  org-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to dummy prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias health-org
+
+      - name: Prepare health report
+        run: |
+          mkdir -p reports
+          echo "## Salesforce Org Health Report" > reports/org-health-report.md
+          echo "" >> reports/org-health-report.md
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> reports/org-health-report.md
+          echo "" >> reports/org-health-report.md
+          echo "Target org: dummy prod" >> reports/org-health-report.md
+          echo "" >> reports/org-health-report.md
+
+      - name: Check org limits
+        run: |
+          echo "### Org Limits" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+          sf org list limits --target-org health-org --json > reports/org-limits.json
+          echo '```json' >> reports/org-health-report.md
+          cat reports/org-limits.json >> reports/org-health-report.md
+          echo '```' >> reports/org-health-report.md
+          echo "" >> reports/org-health-report.md
+
+      - name: Check product health
+        run: |
+          echo "### Product Health" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Active products:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT COUNT() FROM Product2 WHERE IsActive = true" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Products missing ProductCode:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, ProductCode, IsActive FROM Product2 WHERE IsActive = true AND ProductCode = null LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Products without active PricebookEntry:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, ProductCode FROM Product2 WHERE IsActive = true AND Id NOT IN (SELECT Product2Id FROM PricebookEntry WHERE IsActive = true) LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Check opportunity health
+        run: |
+          echo "### Opportunity Health" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Open opportunities with past close date:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, StageName, CloseDate, Amount FROM Opportunity WHERE IsClosed = false AND CloseDate < TODAY LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Opportunities without Account:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, StageName, CloseDate FROM Opportunity WHERE AccountId = null LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Check quote health
+        run: |
+          echo "### Quote Health" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Quotes without Opportunity:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, QuoteNumber, Status FROM Quote WHERE OpportunityId = null LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Check order health
+        run: |
+          echo "### Order Health" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Orders without Account:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, OrderNumber, Status, EffectiveDate FROM Order WHERE AccountId = null LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Check asset health
+        run: |
+          echo "### Asset Health" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Assets without Product:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT Id, Name, AccountId, Product2Id, Status FROM Asset WHERE Product2Id = null LIMIT 50" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Verify deployed fields
+        run: |
+          echo "### Field Verification" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Product fields:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT QualifiedApiName, DataType, Label FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Product2' AND QualifiedApiName IN ('Product_Health_Status__c', 'Deployment_Batch__c', 'Product_Release_Notes__c')" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+          echo "Account priority fields:" | tee -a reports/org-health-report.md
+          sf data query --target-org health-org --query "SELECT QualifiedApiName, DataType, Label FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Account' AND QualifiedApiName LIKE '%Priority%'" | tee -a reports/org-health-report.md
+          echo "" | tee -a reports/org-health-report.md
+
+      - name: Upload org health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: org-health-report
+          path: reports/

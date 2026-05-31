@@ -31,9 +31,49 @@ jobs:
           echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
           sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias prod-org
 
+      - name: Prepare deploy report
+        run: |
+          mkdir -p reports
+          echo "## Salesforce Deploy Report" > reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+          echo "Target org: dummy prod" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+          echo "Manifest: manifest/deploy-package.xml" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+          echo "### Package Items" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+          echo '```xml' >> reports/deploy-report.md
+          cat manifest/deploy-package.xml >> reports/deploy-report.md
+          echo '```' >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+
       - name: Deploy metadata package
         run: |
           sf project deploy start \
             --manifest manifest/deploy-package.xml \
             --target-org prod-org \
-            --test-level NoTestRun
+            --test-level NoTestRun \
+            --json > reports/deploy-result.json
+
+      - name: Add deploy result to report
+        if: always()
+        run: |
+          echo "### Deploy Result" >> reports/deploy-report.md
+          echo "" >> reports/deploy-report.md
+
+          if [ -f reports/deploy-result.json ]; then
+            echo '```json' >> reports/deploy-report.md
+            cat reports/deploy-result.json >> reports/deploy-report.md
+            echo '```' >> reports/deploy-report.md
+          else
+            echo "Deploy result file was not created." >> reports/deploy-report.md
+          fi
+
+      - name: Upload deploy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-report
+          path: reports/

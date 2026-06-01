@@ -79,6 +79,37 @@ const demoData = {
       status: "Warning",
     },
   ],
+  businessData: {
+    Account: [
+      { Id: "001-DEMO-001", Name: "Acme Manufacturing", Industry: "Manufacturing", Type: "Customer", Status: "Active" },
+      { Id: "001-DEMO-002", Name: "Global Media Group", Industry: "Media", Type: "Prospect", Status: "Review" },
+    ],
+    Opportunity: [
+      { Id: "006-DEMO-001", Name: "Acme Renewal FY26", StageName: "Proposal", Amount: "125000", CloseDate: "2026-06-30" },
+      { Id: "006-DEMO-002", Name: "Global Media Expansion", StageName: "Negotiation", Amount: "84000", CloseDate: "2026-07-15" },
+    ],
+    Quote: [
+      { Id: "0Q0-DEMO-001", Name: "Q-0001", QuoteNumber: "Q-0001", Status: "Draft", GrandTotal: "125000" },
+      { Id: "0Q0-DEMO-002", Name: "Q-0002", QuoteNumber: "Q-0002", Status: "Approved", GrandTotal: "84000" },
+    ],
+    Order: [
+      { Id: "801-DEMO-001", OrderNumber: "00000100", Status: "Draft", EffectiveDate: "2026-06-01", TotalAmount: "125000" },
+      { Id: "801-DEMO-002", OrderNumber: "00000101", Status: "Activated", EffectiveDate: "2026-06-03", TotalAmount: "84000" },
+    ],
+    Contract: [
+      { Id: "800-DEMO-001", ContractNumber: "C-0001", Status: "Activated", StartDate: "2026-06-01", EndDate: "2027-05-31" },
+    ],
+    Asset: [
+      { Id: "02i-DEMO-001", Name: "CloudyBot License", Status: "Installed", SerialNumber: "CB-001", InstallDate: "2026-06-01" },
+    ],
+    Product2: [
+      { Id: "01t-DEMO-001", Name: "CloudyBot", ProductCode: "CB-001", IsActive: "true", Family: "Robotics" },
+      { Id: "01t-DEMO-002", Name: "RainbowBot", ProductCode: "RB-001", IsActive: "true", Family: "Robotics" },
+    ],
+    PricebookEntry: [
+      { Id: "01u-DEMO-001", Product2Id: "01t-DEMO-001", UnitPrice: "125000", IsActive: "true" },
+    ],
+  },
   opsActions: [
     {
       id: "platform-health",
@@ -181,6 +212,21 @@ document.getElementById("health-file").addEventListener("change", async (event) 
   render();
 });
 
+document.getElementById("csv-file").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  const objectName = file.name.replace(/\.csv$/i, "");
+  state.businessData[objectName] = parseCsv(text);
+  renderBusinessOptions(objectName);
+  renderBusinessData(objectName);
+  document.querySelector('[data-view="business"]').click();
+});
+
+document.getElementById("business-object-select").addEventListener("change", (event) => {
+  renderBusinessData(event.target.value);
+});
+
 function normalizeImportedData(data) {
   if (Array.isArray(data)) {
     return {
@@ -238,10 +284,55 @@ function render() {
   renderRecommendations();
   renderDomains();
   renderLimits();
+  renderBusinessOptions();
+  renderBusinessData();
   renderQuality();
   renderIncidents();
   renderDeployments();
   renderOpsActions();
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let current = "";
+  let row = [];
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(current);
+      current = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current);
+      if (row.some((value) => value.trim() !== "")) rows.push(row);
+      row = [];
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  if (current || row.length) {
+    row.push(current);
+    rows.push(row);
+  }
+
+  const headers = rows.shift() || [];
+  return rows.map((values) =>
+    headers.reduce((record, header, index) => {
+      record[header || `Column${index + 1}`] = values[index] || "";
+      return record;
+    }, {}),
+  );
 }
 
 function renderEvents() {
@@ -329,6 +420,39 @@ function renderLimits() {
     <table>
       <thead><tr><th>Limit</th><th>Max</th><th>Remaining</th><th>Used</th><th>Status</th></tr></thead>
       <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
+}
+
+function renderBusinessOptions(selectedName) {
+  const select = document.getElementById("business-object-select");
+  const names = Object.keys(state.businessData);
+  const current = selectedName || select.value || names[0];
+  select.innerHTML = names.map((name) => `<option value="${name}">${name}</option>`).join("");
+  select.value = names.includes(current) ? current : names[0];
+}
+
+function renderBusinessData(objectName) {
+  const select = document.getElementById("business-object-select");
+  const name = objectName || select.value || Object.keys(state.businessData)[0];
+  const records = state.businessData[name] || [];
+  document.getElementById("business-count").textContent = `${records.length} records`;
+
+  if (!records.length) {
+    document.getElementById("business-table").innerHTML = "<p>No records loaded for this object.</p>";
+    return;
+  }
+
+  const columns = Object.keys(records[0]).slice(0, 10);
+  document.getElementById("business-table").innerHTML = `
+    <table>
+      <thead><tr>${columns.map((column) => `<th>${column}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${records
+          .slice(0, 100)
+          .map((record) => `<tr>${columns.map((column) => `<td>${record[column] ?? ""}</td>`).join("")}</tr>`)
+          .join("")}
+      </tbody>
     </table>
   `;
 }

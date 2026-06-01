@@ -155,7 +155,8 @@ h2 {
   gap: 10px;
 }
 
-#health-file {
+#health-file,
+#csv-file {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -179,6 +180,11 @@ h2 {
   background: var(--blue);
   border-color: var(--blue);
   color: #fff;
+}
+
+.file-button.muted-file {
+  background: #0f766e;
+  border-color: #0f766e;
 }
 
 .status-strip {
@@ -280,6 +286,7 @@ h2 {
 .timeline,
 .table-wrap {
   padding: 16px;
+  overflow-x: auto;
 }
 
 .event-row {
@@ -383,6 +390,28 @@ h2 {
 table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
+}
+
+.business-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.business-controls select {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.business-note {
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  padding: 12px 16px;
   font-size: 13px;
 }
 

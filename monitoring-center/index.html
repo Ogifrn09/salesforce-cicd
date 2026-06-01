@@ -20,6 +20,7 @@
         <nav class="nav-list">
           <button class="nav-item active" data-view="overview">Overview</button>
           <button class="nav-item" data-view="limits">Org Limits</button>
+          <button class="nav-item" data-view="business">Business Data</button>
           <button class="nav-item" data-view="quality">Data Quality</button>
           <button class="nav-item" data-view="incidents">Incidents</button>
           <button class="nav-item" data-view="deployments">Deployments</button>
@@ -41,6 +42,8 @@
           <div class="topbar-actions">
             <label class="file-button" for="health-file">Import JSON</label>
             <input id="health-file" type="file" accept=".json,application/json" />
+            <label class="file-button muted-file" for="csv-file">Import CSV</label>
+            <input id="csv-file" type="file" accept=".csv,text/csv" />
             <button id="reset-data" class="secondary-button">Reset Demo</button>
           </div>
         </header>
@@ -99,6 +102,22 @@
               <span class="pill neutral">Remaining capacity</span>
             </div>
             <div id="limits-table" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-business">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Business Data Viewer</h2>
+              <div class="business-controls">
+                <select id="business-object-select" aria-label="Select business object"></select>
+                <span id="business-count" class="pill neutral">0 records</span>
+              </div>
+            </div>
+            <div class="business-note">
+              Import CSV dari backup seperti <strong>Account.csv</strong>, <strong>Quote.csv</strong>, <strong>Order.csv</strong>, <strong>Opportunity.csv</strong>, <strong>Asset.csv</strong>, atau <strong>Product2.csv</strong>.
+            </div>
+            <div id="business-table" class="table-wrap"></div>
           </section>
         </section>
 

@@ -1,0 +1,100 @@
+name: Salesforce Platform Health Connector
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  platform-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Auth to dummy prod
+        run: |
+          echo "${{ secrets.SF_PROD_AUTH_URL }}" > ./sf-auth-url.txt
+          sf org login sfdx-url --sfdx-url-file ./sf-auth-url.txt --alias platform-health-org
+
+      - name: Prepare report
+        run: |
+          mkdir -p reports
+          echo "## Salesforce Platform Health Connector" > reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+          echo "Target org: dummy prod" >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Collect org limits
+        run: |
+          echo "### Org Limits" | tee -a reports/platform-health-report.md
+          sf org list limits --target-org platform-health-org --json > reports/org-limits.json
+          echo '```json' >> reports/platform-health-report.md
+          cat reports/org-limits.json >> reports/platform-health-report.md
+          echo '```' >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Collect async apex failures
+        run: |
+          echo "### Async Apex Failures" | tee -a reports/platform-health-report.md
+          sf data query \
+            --target-org platform-health-org \
+            --query "SELECT Id, Status, JobType, NumberOfErrors, CreatedDate, CompletedDate FROM AsyncApexJob WHERE CreatedDate = LAST_N_DAYS:1 AND (Status = 'Failed' OR NumberOfErrors > 0) ORDER BY CreatedDate DESC LIMIT 100" \
+            --json > reports/async-apex-failures.json
+          cat reports/async-apex-failures.json >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Collect apex test failures
+        run: |
+          echo "### Apex Test Failures" | tee -a reports/platform-health-report.md
+          sf data query \
+            --target-org platform-health-org \
+            --query "SELECT Id, MethodName, Outcome, Message, RunTime FROM ApexTestResult WHERE Outcome != 'Pass' ORDER BY TestTimestamp DESC LIMIT 100" \
+            --json > reports/apex-test-failures.json
+          cat reports/apex-test-failures.json >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Collect login failures
+        run: |
+          echo "### Login Failures" | tee -a reports/platform-health-report.md
+          sf data query \
+            --target-org platform-health-org \
+            --query "SELECT Id, LoginTime, Status, SourceIp, Browser, Platform FROM LoginHistory WHERE LoginTime = LAST_N_DAYS:1 AND Status != 'Success' ORDER BY LoginTime DESC LIMIT 100" \
+            --json > reports/login-failures.json
+          cat reports/login-failures.json >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Collect data quality checks
+        run: |
+          echo "### Data Quality Checks" | tee -a reports/platform-health-report.md
+          sf data query \
+            --target-org platform-health-org \
+            --query "SELECT Id, Name, ProductCode, IsActive FROM Product2 WHERE IsActive = true AND ProductCode = null LIMIT 100" \
+            --json > reports/products-missing-code.json
+          sf data query \
+            --target-org platform-health-org \
+            --query "SELECT Id, Name, StageName, CloseDate, Amount FROM Opportunity WHERE IsClosed = false AND CloseDate < TODAY LIMIT 100" \
+            --json > reports/opportunities-past-close.json
+          echo "Products missing code:" >> reports/platform-health-report.md
+          cat reports/products-missing-code.json >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+          echo "Open opportunities past close date:" >> reports/platform-health-report.md
+          cat reports/opportunities-past-close.json >> reports/platform-health-report.md
+          echo "" >> reports/platform-health-report.md
+
+      - name: Create Excel platform health report
+        if: always()
+        run: python3 scripts/create_platform_health_excel_report.py
+
+      - name: Upload platform health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-health-report
+          path: reports/

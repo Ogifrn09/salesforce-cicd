@@ -1,0 +1,49 @@
+# Salesforce Monitoring Center
+
+Static MVP dashboard for observing Salesforce platform health and recovery readiness.
+
+Open:
+
+```text
+monitoring-center/index.html
+```
+
+The app includes demo data and can import a JSON health event file. Supported JSON shapes:
+
+```json
+[
+  {
+    "source": "salesforce",
+    "domain": "Product",
+    "check": "products_missing_code",
+    "severity": "YELLOW",
+    "count": 1,
+    "message": "Active products missing ProductCode"
+  }
+]
+```
+
+or:
+
+```json
+{
+  "generatedAt": "2026-06-01 01:00:00 WIB",
+  "environment": "trailhead",
+  "status": "YELLOW",
+  "events": []
+}
+```
+
+## Ops Actions
+
+The `Ops Actions` tab gives operations users a controlled launcher for GitHub Actions workflows:
+
+- Run Platform Health
+- Run Org Health
+- Backup Metadata
+- Backup Business Data
+- Deploy Metadata
+- Rollback Metadata
+- Restore Data
+
+Because this MVP is a static app, each action opens the related GitHub Actions workflow page and shows the required inputs/checklist. A future backend can call the GitHub Actions API directly.

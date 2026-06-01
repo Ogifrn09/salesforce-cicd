@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Salesforce Monitoring Center</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <div class="brand-block">
+          <div class="brand-mark">SF</div>
+          <div>
+            <div class="brand-title">Monitoring Center</div>
+            <div class="brand-subtitle">Dummy Prod Observability</div>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-view="overview">Overview</button>
+          <button class="nav-item" data-view="limits">Org Limits</button>
+          <button class="nav-item" data-view="quality">Data Quality</button>
+          <button class="nav-item" data-view="incidents">Incidents</button>
+          <button class="nav-item" data-view="deployments">Deployments</button>
+          <button class="nav-item" data-view="actions">Ops Actions</button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="environment-label">Environment</div>
+          <div class="environment-value">trailhead</div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <h1>Salesforce Platform Health</h1>
+            <p id="last-run">Last run pending</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="file-button" for="health-file">Import JSON</label>
+            <input id="health-file" type="file" accept=".json,application/json" />
+            <button id="reset-data" class="secondary-button">Reset Demo</button>
+          </div>
+        </header>
+
+        <section class="status-strip" aria-label="Health summary">
+          <div class="status-panel overall">
+            <span class="panel-label">Overall</span>
+            <strong id="overall-status">GREEN</strong>
+          </div>
+          <div class="status-panel">
+            <span class="panel-label">Critical</span>
+            <strong id="critical-count">0</strong>
+          </div>
+          <div class="status-panel">
+            <span class="panel-label">Warning</span>
+            <strong id="warning-count">0</strong>
+          </div>
+          <div class="status-panel">
+            <span class="panel-label">API Used</span>
+            <strong id="api-used">0%</strong>
+          </div>
+        </section>
+
+        <section class="view active" id="view-overview">
+          <div class="grid two-col">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Health Events</h2>
+                <span id="event-total" class="pill">0 events</span>
+              </div>
+              <div id="event-list" class="event-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Recommended Actions</h2>
+                <span class="pill neutral">Runbook</span>
+              </div>
+              <div id="recommendations" class="recommendation-list"></div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Domain Snapshot</h2>
+              <span class="pill neutral">CRM / Order / Recovery</span>
+            </div>
+            <div id="domain-grid" class="domain-grid"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-limits">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Org Limits</h2>
+              <span class="pill neutral">Remaining capacity</span>
+            </div>
+            <div id="limits-table" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-quality">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Data Quality Checks</h2>
+              <span class="pill neutral">Business records</span>
+            </div>
+            <div id="quality-table" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-incidents">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Incident Queue</h2>
+              <span class="pill neutral">Operational follow-up</span>
+            </div>
+            <div id="incident-table" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-deployments">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Deploy & Recovery Evidence</h2>
+              <span class="pill neutral">Audit trail</span>
+            </div>
+            <div id="deployment-timeline" class="timeline"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-actions">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Ops Run Actions</h2>
+              <span class="pill neutral">GitHub Actions launcher</span>
+            </div>
+            <div class="actions-layout">
+              <div id="ops-action-list" class="ops-action-list"></div>
+              <aside class="action-detail" aria-live="polite">
+                <div class="action-detail-header">
+                  <span id="action-severity" class="severity GREEN">READY</span>
+                  <h3 id="action-title">Select an action</h3>
+                </div>
+                <p id="action-description">Choose an operational action to see when to run it, which workflow it opens, and what inputs the operator must provide.</p>
+                <div class="action-meta">
+                  <div>
+                    <span>Workflow</span>
+                    <strong id="action-workflow">-</strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong id="action-target">-</strong>
+                  </div>
+                </div>
+                <div>
+                  <h4>Required Inputs</h4>
+                  <ul id="action-inputs" class="input-list"></ul>
+                </div>
+                <div>
+                  <h4>Operator Checklist</h4>
+                  <ul id="action-checklist" class="input-list"></ul>
+                </div>
+                <button id="open-workflow" class="primary-action">Open Workflow</button>
+              </aside>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -750,7 +750,270 @@ Setelah rollback:
 Query field harus return 0 record jika field berhasil dihapus.
 ```
 
-## 26. Kesimpulan
+## 26. Salesforce Org Health Monitoring
+
+Workflow:
+
+```text
+Salesforce Org Health
+```
+
+File:
+
+```text
+.github/workflows/salesforce-org-health.yml
+```
+
+Target:
+
+```text
+SF_PROD_AUTH_URL -> dummy prod
+```
+
+Tujuan:
+
+```text
+Memberikan laporan health org Salesforce secara terjadwal dan manual.
+```
+
+Area yang dicek:
+
+- Org Limits
+- Product Health
+- Opportunity Health
+- Quote Health
+- Order Health
+- Asset Health
+- Field Verification
+
+Artifact:
+
+```text
+org-health-report
+```
+
+Isi artifact:
+
+```text
+org-health-report.md
+org-limits.json
+org-health-report.xlsx
+```
+
+Sheet Excel:
+
+```text
+Summary
+Org Limits
+Health Report
+```
+
+Cara menjalankan manual:
+
+```text
+Actions
+Salesforce Org Health
+Run workflow
+Branch: main
+```
+
+Cara membaca `Org Limits`:
+
+```text
+Limit Name  = nama limit Salesforce
+Max         = batas maksimal
+Remaining   = sisa limit
+```
+
+Contoh:
+
+```text
+DailyApiRequests
+Max: 15000
+Remaining: 14661
+```
+
+Artinya API request harian masih tersisa 14.661 dari 15.000.
+
+## 27. Salesforce Platform Health Connector
+
+Workflow:
+
+```text
+Salesforce Platform Health Connector
+```
+
+File:
+
+```text
+.github/workflows/salesforce-platform-health.yml
+scripts/create_platform_health_excel_report.py
+```
+
+Target:
+
+```text
+SF_PROD_AUTH_URL -> dummy prod
+```
+
+Jadwal:
+
+```text
+Setiap hari jam 01:00 WIB
+```
+
+Cron GitHub:
+
+```yaml
+schedule:
+  - cron: "0 18 * * *"
+```
+
+Catatan:
+
+```text
+GitHub Actions memakai UTC.
+01:00 WIB = 18:00 UTC hari sebelumnya.
+```
+
+Tujuan connector:
+
+```text
+Observe Salesforce platform health & performance secara terjadwal.
+```
+
+Area yang dicek:
+
+- Org limits
+- API usage / remaining limit
+- Async Apex failures
+- Apex test failures
+- Login failures
+- Product missing code
+- Open Opportunity lewat CloseDate
+- Recommendations
+
+Artifact:
+
+```text
+platform-health-report
+```
+
+Isi artifact:
+
+```text
+platform-health-report.md
+platform-health-report.xlsx
+org-limits.json
+async-apex-failures.json
+apex-test-failures.json
+login-failures.json
+products-missing-code.json
+opportunities-past-close.json
+```
+
+Sheet Excel:
+
+```text
+Summary
+Org Limits
+Async Apex Failures
+Apex Test Failures
+Login Failures
+Data Quality
+Recommendations
+```
+
+Cara menjalankan manual:
+
+```text
+Actions
+Salesforce Platform Health Connector
+Run workflow
+Branch: main
+```
+
+Cara membaca status:
+
+```text
+GREEN  = tidak ada critical issue
+YELLOW = ada warning data quality atau login failure
+RED    = ada critical issue seperti Apex failure atau test failure
+```
+
+Contoh issue yang perlu diperhatikan:
+
+```text
+DailyApiRequests remaining rendah
+Async Apex job failed
+Apex test failure
+Failed login meningkat
+Product aktif tanpa ProductCode
+Opportunity masih open tapi CloseDate sudah lewat
+```
+
+## 28. Mapping ke Observability dan Backup Recovery
+
+Solusi yang sudah dibuat bisa dipakai sebagai MVP connector untuk:
+
+```text
+Test konektor Salesforce buat observe platform health & performance.
+```
+
+Alur connector:
+
+```text
+GitHub Actions Scheduler
+-> Salesforce CLI
+-> SF_PROD_AUTH_URL
+-> Query health/performance signals
+-> Generate Markdown, JSON, dan Excel report
+-> Upload artifact sebagai evidence
+```
+
+Mapping ke kebutuhan observability:
+
+```text
+API limit monitoring        -> Org Limits
+Apex performance/failure    -> Async Apex Failures
+Testing health              -> Apex Test Failures
+Security signal             -> Login Failures
+Data quality                -> Product dan Opportunity checks
+Audit evidence              -> Excel, Markdown, JSON artifacts
+Scheduled monitoring        -> Daily 01:00 WIB
+```
+
+Mapping ke Backup & Recovery Maturity:
+
+```text
+Backup metadata             -> Salesforce Metadata Backup
+Backup data                 -> Salesforce Data Backup
+Pre-deploy validation       -> Salesforce Validate
+Controlled deployment       -> Salesforce Manual Deploy
+Deploy evidence             -> deploy-report.xlsx
+Health monitoring           -> Org Health dan Platform Health Connector
+Rollback metadata           -> Salesforce Manual Rollback
+Data restore                -> Salesforce Manual Data Restore
+RPO/RTO simulation          -> deploy, verify, rollback, restore drill
+```
+
+## 29. Production Enhancement Ideas
+
+Untuk production sungguhan, solusi ini bisa diperkuat dengan:
+
+- Private repository
+- Dedicated Salesforce integration user
+- Secret rotation policy
+- Approval sebelum deploy production
+- Alert ke Slack, Email, atau Microsoft Teams
+- Retention policy untuk artifact backup dan report
+- Backup data ke secure storage
+- Multi-org monitoring
+- Event Monitoring integration
+- Threshold RED/YELLOW/GREEN yang disepakati bisnis
+- Recovery drill berkala untuk menguji RPO dan RTO
+
+## 30. Kesimpulan
 
 Alur latihan yang sudah dibangun:
 
@@ -764,6 +1027,8 @@ Dummy Dev
 -> Manual deploy
 -> Deploy report Excel
 -> Verify prod
+-> Org Health Monitoring
+-> Platform Health Connector
 -> Rollback metadata
 -> Manual data restore jika diperlukan
 ```

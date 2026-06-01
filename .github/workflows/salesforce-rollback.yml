@@ -1,4 +1,4 @@
-name: Salesforce Manual Rollback
+name: Salesforce Metadata Rollback
 
 on:
   workflow_dispatch:

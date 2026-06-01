@@ -63,11 +63,15 @@ jobs:
       - name: Collect login failures
         run: |
           echo "### Login Failures" | tee -a reports/platform-health-report.md
-          sf data query \
+          if sf data query \
             --target-org platform-health-org \
             --query "SELECT Id, LoginTime, Status, SourceIp, Browser, Platform FROM LoginHistory WHERE LoginTime = LAST_N_DAYS:1 AND Status != 'Success' ORDER BY LoginTime DESC LIMIT 100" \
-            --json > reports/login-failures.json
-          cat reports/login-failures.json >> reports/platform-health-report.md
+            --json > reports/login-failures.json; then
+            cat reports/login-failures.json >> reports/platform-health-report.md
+          else
+            echo '{"result":{"records":[]},"warning":"LoginHistory query failed or is not available in this org."}' > reports/login-failures.json
+            cat reports/login-failures.json >> reports/platform-health-report.md
+          fi
           echo "" >> reports/platform-health-report.md
 
       - name: Collect data quality checks

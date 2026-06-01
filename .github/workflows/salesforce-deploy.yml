@@ -1,4 +1,4 @@
-name: Salesforce Manual Deploy
+name: Salesforce Deploy Production
 
 on:
   workflow_dispatch:

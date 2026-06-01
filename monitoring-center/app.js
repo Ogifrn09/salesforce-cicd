@@ -213,13 +213,17 @@ document.getElementById("health-file").addEventListener("change", async (event) 
 });
 
 document.getElementById("csv-file").addEventListener("change", async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const text = await file.text();
-  const objectName = file.name.replace(/\.csv$/i, "");
-  state.businessData[objectName] = parseCsv(text);
-  renderBusinessOptions(objectName);
-  renderBusinessData(objectName);
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  let lastObjectName = "";
+  for (const file of files) {
+    const text = await file.text();
+    const objectName = file.name.replace(/\.error\.csv$/i, " Error").replace(/\.csv$/i, "");
+    state.businessData[objectName] = parseCsv(text);
+    lastObjectName = objectName;
+  }
+  renderBusinessOptions(lastObjectName);
+  renderBusinessData(lastObjectName);
   document.querySelector('[data-view="business"]').click();
 });
 

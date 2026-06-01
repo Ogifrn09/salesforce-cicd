@@ -38,10 +38,18 @@ jobs:
             fi
 
             echo "Backing up ${file_name}"
-            sf data query \
+            if sf data query \
               --target-org data-backup-org \
               --query "${soql}" \
-              --result-format csv > "${backup_dir}/${file_name}.csv"
+              --result-format csv > "${backup_dir}/${file_name}.csv"; then
+              echo "Backup completed for ${file_name}"
+            else
+              echo "Backup failed for ${file_name}; writing error marker and continuing."
+              {
+                echo "Object,Status,Message"
+                echo "\"${file_name}\",\"FAILED\",\"Object not supported or query failed in target org\""
+              } > "${backup_dir}/${file_name}.error.csv"
+            fi
           done < config/data-backup-queries.txt
 
       - name: Commit data backup changes

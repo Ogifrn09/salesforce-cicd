@@ -6,80 +6,189 @@
     <title>Salesforce Monitoring Center</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="auth-locked">
+    <section id="login-screen" class="login-screen" aria-label="Login">
+      <div class="login-card">
+        <div class="login-brand">
+          <div class="brand-mark">SF</div>
+          <div>
+            <div class="brand-title">SF Monitoring Center</div>
+            <div class="brand-subtitle">Secure dashboard access</div>
+          </div>
+        </div>
+        <form id="login-form" class="login-form">
+          <div>
+            <span class="section-kicker">Operator login</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to view Salesforce platform health, incidents, and recovery readiness.</p>
+          </div>
+          <label>
+            Username
+            <input id="login-username" type="text" autocomplete="username" placeholder="admin" required />
+          </label>
+          <label>
+            Password
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="monitoring123" required />
+          </label>
+          <button class="primary-action" type="submit">Sign in</button>
+          <p id="login-error" class="login-error" role="alert"></p>
+          <p class="login-hint">Demo access: admin / monitoring123. Use OAuth or SSO for production.</p>
+        </form>
+      </div>
+    </section>
+
     <div class="app-shell">
       <aside class="sidebar" aria-label="Workspace navigation">
         <div class="brand-block">
           <div class="brand-mark">SF</div>
           <div>
-            <div class="brand-title">Monitoring Center</div>
-            <div class="brand-subtitle">Dummy Prod Observability</div>
+            <div class="brand-title">SF Monitoring Center</div>
+            <div class="brand-subtitle">Salesforce Observability</div>
           </div>
         </div>
 
         <nav class="nav-list">
-          <button class="nav-item active" data-view="overview">Overview</button>
-          <button class="nav-item" data-view="limits">Org Limits</button>
-          <button class="nav-item" data-view="business">Business Data</button>
-          <button class="nav-item" data-view="quality">Data Quality</button>
-          <button class="nav-item" data-view="incidents">Incidents</button>
-          <button class="nav-item" data-view="deployments">Deployments</button>
-          <button class="nav-item" data-view="actions">Ops Actions</button>
+          <button class="nav-item active" data-view="overview"><span class="nav-icon">H</span>Overview</button>
+          <button class="nav-item" data-view="limits"><span class="nav-icon">L</span>Org Limits</button>
+          <button class="nav-item" data-view="business"><span class="nav-icon">B</span>Business Data</button>
+          <button class="nav-item" data-view="quality"><span class="nav-icon">Q</span>Data Quality</button>
+          <button class="nav-item" data-view="incidents"><span class="nav-icon">I</span>Incidents</button>
+          <button class="nav-item" data-view="deployments"><span class="nav-icon">D</span>Deployments</button>
+          <button class="nav-item" data-view="actions"><span class="nav-icon">A</span>Actions</button>
+          <button class="nav-item" data-view="config"><span class="nav-icon">C</span>Config</button>
         </nav>
 
         <div class="sidebar-footer">
           <div class="environment-label">Environment</div>
-          <div class="environment-value">trailhead</div>
+          <div class="environment-card">
+            <span class="environment-dot"></span>
+            <div>
+              <div class="environment-value">trailhead</div>
+              <div class="environment-meta">Salesforce Org</div>
+            </div>
+          </div>
         </div>
       </aside>
 
       <main class="main-content">
         <header class="topbar">
           <div>
-            <h1>Salesforce Platform Health</h1>
+            <div class="eyebrow"><span class="live-dot"></span>Live monitoring</div>
+            <h1>Platform Health</h1>
             <p id="last-run">Last run pending</p>
           </div>
-          <div class="topbar-actions">
-            <label class="file-button" for="health-file">Import JSON</label>
-            <input id="health-file" type="file" accept=".json,application/json" />
-            <label class="file-button muted-file" for="csv-file">Import CSV</label>
-            <input id="csv-file" type="file" accept=".csv,text/csv" multiple />
-            <button id="reset-data" class="secondary-button">Reset Demo</button>
+          <div class="topbar-actions" aria-label="Dashboard actions">
+            <div class="session-user" aria-label="Signed in user">
+              <span class="session-avatar">A</span>
+              <span>
+                <span class="session-label">Signed in</span>
+                <strong id="session-user">admin</strong>
+              </span>
+            </div>
+
+            <div class="action-cluster primary-cluster" aria-label="Import data">
+              <label class="file-button" for="health-file"><span>Import</span> JSON</label>
+              <input id="health-file" type="file" accept=".json,application/json" />
+              <label class="file-button muted-file" for="csv-file"><span>Import</span> CSV</label>
+              <input id="csv-file" type="file" accept=".csv,text/csv" multiple />
+            </div>
+
+            <div class="action-cluster secondary-cluster" aria-label="Report actions">
+              <button id="export-json" class="secondary-button">Export JSON</button>
+              <button id="print-report" class="secondary-button">Print</button>
+              <button id="reset-data" class="secondary-button">Reset</button>
+            </div>
+
+            <button id="logout-button" class="logout-button">Logout</button>
           </div>
         </header>
 
         <section class="status-strip" aria-label="Health summary">
           <div class="status-panel overall">
-            <span class="panel-label">Overall</span>
-            <strong id="overall-status">GREEN</strong>
+            <div class="status-panel-head">
+              <span class="panel-label">Overall health</span>
+              <span class="trend-chip">7D trend</span>
+            </div>
+            <div class="overall-value">
+              <span class="overall-check">!</span>
+              <strong id="overall-status">GREEN</strong>
+            </div>
+            <span class="status-caption">Key platform indicators</span>
+            <div class="sparkline overall-sparkline"></div>
           </div>
-          <div class="status-panel">
+          <div class="status-panel metric-card critical-card">
             <span class="panel-label">Critical</span>
             <strong id="critical-count">0</strong>
+            <span class="status-caption">Immediate attention</span>
+            <div class="metric-line"></div>
           </div>
-          <div class="status-panel">
+          <div class="status-panel metric-card warning-card">
             <span class="panel-label">Warning</span>
             <strong id="warning-count">0</strong>
+            <span class="status-caption">Require review</span>
+            <div class="metric-bars"></div>
           </div>
-          <div class="status-panel">
-            <span class="panel-label">API Used</span>
-            <strong id="api-used">0%</strong>
+          <div class="status-panel metric-card api-card">
+            <span class="panel-label">API used</span>
+            <div class="api-gauge"><strong id="api-used">0%</strong></div>
+            <span class="status-caption">Daily request capacity</span>
           </div>
         </section>
 
         <section class="view active" id="view-overview">
+          <section class="panel priority-panel">
+            <div class="panel-header">
+              <div>
+                <span class="section-kicker">Operator brief</span>
+                <h2>What to do first</h2>
+              </div>
+              <span id="recovery-score" class="pill">Score pending</span>
+            </div>
+            <div id="priority-summary" class="priority-summary"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="section-kicker">Trend &amp; analytics</span>
+                <h2>Monitoring visuals</h2>
+              </div>
+              <span class="pill neutral">Snapshot</span>
+            </div>
+            <div id="trend-grid" class="trend-grid"></div>
+          </section>
+
           <div class="grid two-col">
             <section class="panel">
               <div class="panel-header">
-                <h2>Health Events</h2>
+                <div>
+                  <span class="section-kicker">Signal stream</span>
+                  <h2>What needs attention</h2>
+                </div>
                 <span id="event-total" class="pill">0 events</span>
+              </div>
+              <div class="event-toolbar">
+                <input id="event-search" type="search" placeholder="Search event, domain, or check" aria-label="Search health events" />
+                <select id="severity-filter" aria-label="Filter by severity">
+                  <option value="ALL">All severity</option>
+                  <option value="RED">Critical</option>
+                  <option value="YELLOW">Warning</option>
+                  <option value="GREEN">Healthy</option>
+                </select>
+                <select id="domain-filter" aria-label="Filter by domain">
+                  <option value="ALL">All domains</option>
+                </select>
+                <button id="clear-filters" class="secondary-button compact-button">Clear</button>
               </div>
               <div id="event-list" class="event-list"></div>
             </section>
 
             <section class="panel">
               <div class="panel-header">
-                <h2>Recommended Actions</h2>
+                <div>
+                  <span class="section-kicker">Recovery readiness</span>
+                  <h2>Recommended actions</h2>
+                </div>
                 <span class="pill neutral">Runbook</span>
               </div>
               <div id="recommendations" class="recommendation-list"></div>
@@ -88,7 +197,10 @@
 
           <section class="panel">
             <div class="panel-header">
-              <h2>Domain Snapshot</h2>
+              <div>
+                <span class="section-kicker">Current coverage</span>
+                <h2>Domain health</h2>
+              </div>
               <span class="pill neutral">CRM / Order / Recovery</span>
             </div>
             <div id="domain-grid" class="domain-grid"></div>
@@ -97,10 +209,7 @@
 
         <section class="view" id="view-limits">
           <section class="panel">
-            <div class="panel-header">
-              <h2>Org Limits</h2>
-              <span class="pill neutral">Remaining capacity</span>
-            </div>
+            <div class="panel-header"><div><span class="section-kicker">Capacity</span><h2>Org limits</h2></div><span class="pill neutral">Remaining capacity</span></div>
             <div id="limits-table" class="table-wrap"></div>
           </section>
         </section>
@@ -108,89 +217,85 @@
         <section class="view" id="view-business">
           <section class="panel">
             <div class="panel-header">
-              <h2>Business Data Viewer</h2>
-              <div class="business-controls">
-                <select id="business-object-select" aria-label="Select business object"></select>
-                <span id="business-count" class="pill neutral">0 records</span>
-              </div>
+              <div><span class="section-kicker">Data explorer</span><h2>Business data viewer</h2></div>
+              <div class="business-controls"><select id="business-object-select" aria-label="Select business object"></select><span id="business-count" class="pill neutral">0 records</span></div>
             </div>
-            <div class="business-note">
-              Import CSV dari backup seperti <strong>Account.csv</strong>, <strong>Quote.csv</strong>, <strong>Order.csv</strong>, <strong>Opportunity.csv</strong>, <strong>Asset.csv</strong>, atau <strong>Product2.csv</strong>.
-            </div>
+            <div class="business-note">Import CSV dari backup seperti <strong>Account.csv</strong>, <strong>Quote.csv</strong>, <strong>Order.csv</strong>, <strong>Opportunity.csv</strong>, <strong>Asset.csv</strong>, atau <strong>Product2.csv</strong>.</div>
             <div id="business-table" class="table-wrap"></div>
           </section>
         </section>
 
         <section class="view" id="view-quality">
           <section class="panel">
-            <div class="panel-header">
-              <h2>Data Quality Checks</h2>
-              <span class="pill neutral">Business records</span>
-            </div>
+            <div class="panel-header"><div><span class="section-kicker">Business records</span><h2>Data quality checks</h2></div><span class="pill neutral">Business records</span></div>
             <div id="quality-table" class="table-wrap"></div>
           </section>
         </section>
 
         <section class="view" id="view-incidents">
           <section class="panel">
-            <div class="panel-header">
-              <h2>Incident Queue</h2>
-              <span class="pill neutral">Operational follow-up</span>
-            </div>
+            <div class="panel-header"><div><span class="section-kicker">Operational follow-up</span><h2>Incident queue</h2></div><span id="incident-summary" class="pill neutral">Open issues</span></div>
             <div id="incident-table" class="table-wrap"></div>
           </section>
         </section>
 
         <section class="view" id="view-deployments">
           <section class="panel">
-            <div class="panel-header">
-              <h2>Deploy & Recovery Evidence</h2>
-              <span class="pill neutral">Audit trail</span>
-            </div>
+            <div class="panel-header"><div><span class="section-kicker">Audit trail</span><h2>Deploy &amp; recovery evidence</h2></div><span class="pill neutral">Recent activity</span></div>
             <div id="deployment-timeline" class="timeline"></div>
           </section>
         </section>
 
         <section class="view" id="view-actions">
           <section class="panel">
-            <div class="panel-header">
-              <h2>Ops Run Actions</h2>
-              <span class="pill neutral">GitHub Actions launcher</span>
-            </div>
+            <div class="panel-header"><div><span class="section-kicker">Runbook shortcuts</span><h2>Ops run actions</h2></div><span class="pill neutral">GitHub Actions launcher</span></div>
             <div class="actions-layout">
               <div id="ops-action-list" class="ops-action-list"></div>
               <aside class="action-detail" aria-live="polite">
-                <div class="action-detail-header">
-                  <span id="action-severity" class="severity GREEN">READY</span>
-                  <h3 id="action-title">Select an action</h3>
-                </div>
+                <div class="action-detail-header"><span id="action-severity" class="severity GREEN">READY</span><h3 id="action-title">Select an action</h3></div>
                 <p id="action-description">Choose an operational action to see when to run it, which workflow it opens, and what inputs the operator must provide.</p>
-                <div class="action-meta">
-                  <div>
-                    <span>Workflow</span>
-                    <strong id="action-workflow">-</strong>
-                  </div>
-                  <div>
-                    <span>Target</span>
-                    <strong id="action-target">-</strong>
-                  </div>
-                </div>
-                <div>
-                  <h4>Required Inputs</h4>
-                  <ul id="action-inputs" class="input-list"></ul>
-                </div>
-                <div>
-                  <h4>Operator Checklist</h4>
-                  <ul id="action-checklist" class="input-list"></ul>
-                </div>
-                <button id="open-workflow" class="primary-action">Open Workflow</button>
+                <div class="action-meta"><div><span>Workflow</span><strong id="action-workflow">-</strong></div><div><span>Target</span><strong id="action-target">-</strong></div></div>
+                <div><h4>Required inputs</h4><ul id="action-inputs" class="input-list"></ul></div>
+                <div><h4>Operator checklist</h4><ul id="action-checklist" class="input-list"></ul></div>
+                <button id="open-workflow" class="primary-action">Open workflow</button>
               </aside>
             </div>
           </section>
         </section>
+
+        <section class="view" id="view-config">
+          <div class="grid two-col">
+            <section class="panel">
+              <div class="panel-header">
+                <div><span class="section-kicker">Data source</span><h2>Report source</h2></div>
+                <span id="source-status" class="pill neutral">No fetch yet</span>
+              </div>
+              <div class="config-form">
+                <label>Health JSON URL <input id="data-source-url" type="url" placeholder="https://raw.githubusercontent.com/.../health.json" /></label>
+                <label>GitHub workflow base URL <input id="repo-url-input" type="url" placeholder="https://github.com/Ogifrn09/salesforce-cicd/actions/workflows" /></label>
+                <button id="load-source" class="primary-action">Load report source</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div><span class="section-kicker">Rules</span><h2>Monitoring configuration</h2></div>
+                <span class="pill neutral">Local only</span>
+              </div>
+              <div class="config-form">
+                <label>Warning threshold (%) <input id="warning-threshold" type="number" min="1" max="100" value="80" /></label>
+                <label>Critical threshold (%) <input id="critical-threshold" type="number" min="1" max="100" value="90" /></label>
+                <label>Monitored domains <input id="monitored-domains" type="text" value="Product, Opportunity, Apex, Security" /></label>
+                <div class="export-row">
+                  <button id="save-config" class="primary-action">Save config</button>
+                  <button id="export-csv" class="secondary-button">Export Events CSV</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
-
     <script src="./app.js"></script>
   </body>
 </html>

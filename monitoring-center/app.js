@@ -184,10 +184,31 @@ const demoData = {
   ],
 };
 
+const defaultConfig = {
+  reportUrl: "",
+  workflowBaseUrl: "https://github.com/Ogifrn09/salesforce-cicd/actions/workflows",
+  warningThreshold: 80,
+  criticalThreshold: 90,
+  monitoredDomains: ["Product", "Opportunity", "Apex", "Security"],
+};
+
+const demoCredentials = {
+  username: "admin",
+  password: "monitoring123",
+};
+
 let state = structuredClone(demoData);
+let config = loadConfig();
+let uiState = {
+  search: "",
+  severity: "ALL",
+  domain: "ALL",
+};
 
 const views = document.querySelectorAll(".view");
 const navItems = document.querySelectorAll(".nav-item");
+
+initAuth();
 
 navItems.forEach((item) => {
   item.addEventListener("click", () => {
@@ -203,18 +224,86 @@ document.getElementById("reset-data").addEventListener("click", () => {
   render();
 });
 
+document.getElementById("login-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+
+  if (username === demoCredentials.username && password === demoCredentials.password) {
+    sessionStorage.setItem("sf-monitoring-user", username);
+    document.getElementById("login-error").textContent = "";
+    applyAuthState();
+    return;
+  }
+
+  document.getElementById("login-error").textContent = "Username atau password salah.";
+});
+
+document.getElementById("logout-button").addEventListener("click", () => {
+  sessionStorage.removeItem("sf-monitoring-user");
+  document.getElementById("login-password").value = "";
+  applyAuthState();
+});
+
+document.getElementById("event-search").addEventListener("input", (event) => {
+  uiState.search = event.target.value.trim().toLowerCase();
+  renderEvents();
+});
+
+document.getElementById("severity-filter").addEventListener("change", (event) => {
+  uiState.severity = event.target.value;
+  renderEvents();
+});
+
+document.getElementById("domain-filter").addEventListener("change", (event) => {
+  uiState.domain = event.target.value;
+  renderEvents();
+});
+
+document.getElementById("clear-filters").addEventListener("click", () => {
+  uiState = { search: "", severity: "ALL", domain: "ALL" };
+  document.getElementById("event-search").value = "";
+  document.getElementById("severity-filter").value = "ALL";
+  document.getElementById("domain-filter").value = "ALL";
+  renderEvents();
+});
+
+document.getElementById("export-json").addEventListener("click", () => {
+  downloadFile("salesforce-monitoring-report.json", JSON.stringify(buildReport(), null, 2), "application/json");
+});
+
+document.getElementById("export-csv").addEventListener("click", () => {
+  downloadFile("salesforce-health-events.csv", eventsToCsv(state.events), "text/csv");
+});
+
+document.getElementById("print-report").addEventListener("click", () => {
+  window.print();
+});
+
+document.getElementById("load-source").addEventListener("click", loadReportSource);
+
+document.getElementById("save-config").addEventListener("click", () => {
+  config = readConfigFromForm();
+  localStorage.setItem("sf-monitoring-config", JSON.stringify(config));
+  document.getElementById("source-status").textContent = "Config saved";
+  render();
+});
+
 document.getElementById("health-file").addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
+  setLoading("Importing JSON report...");
   const text = await file.text();
   const parsed = JSON.parse(text);
   state = normalizeImportedData(parsed);
+  setLoading("");
   render();
 });
 
 document.getElementById("csv-file").addEventListener("change", async (event) => {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
+  setLoading(`Importing ${files.length} CSV file${files.length === 1 ? "" : "s"}...`);
   let lastObjectName = "";
   for (const file of files) {
     const text = await file.text();
@@ -225,49 +314,187 @@ document.getElementById("csv-file").addEventListener("change", async (event) => 
   renderBusinessOptions(lastObjectName);
   renderBusinessData(lastObjectName);
   document.querySelector('[data-view="business"]').click();
+  setLoading("");
 });
 
 document.getElementById("business-object-select").addEventListener("change", (event) => {
   renderBusinessData(event.target.value);
 });
 
+function initAuth() {
+  applyAuthState();
+}
+
+function applyAuthState() {
+  const user = sessionStorage.getItem("sf-monitoring-user");
+  const isAuthenticated = Boolean(user);
+  document.body.classList.toggle("auth-locked", !isAuthenticated);
+  document.body.classList.toggle("auth-ready", isAuthenticated);
+  document.getElementById("login-screen").setAttribute("aria-hidden", String(isAuthenticated));
+  document.getElementById("session-user").textContent = isAuthenticated ? user : "";
+  if (!isAuthenticated) {
+    document.getElementById("login-username").focus();
+  }
+}
+
+function loadConfig() {
+  try {
+    return { ...defaultConfig, ...(JSON.parse(localStorage.getItem("sf-monitoring-config")) || {}) };
+  } catch {
+    return { ...defaultConfig };
+  }
+}
+
+function hydrateConfigForm() {
+  document.getElementById("data-source-url").value = config.reportUrl || "";
+  document.getElementById("repo-url-input").value = config.workflowBaseUrl || defaultConfig.workflowBaseUrl;
+  document.getElementById("warning-threshold").value = config.warningThreshold;
+  document.getElementById("critical-threshold").value = config.criticalThreshold;
+  document.getElementById("monitored-domains").value = config.monitoredDomains.join(", ");
+}
+
+function readConfigFromForm() {
+  return {
+    reportUrl: document.getElementById("data-source-url").value.trim(),
+    workflowBaseUrl: document.getElementById("repo-url-input").value.trim() || defaultConfig.workflowBaseUrl,
+    warningThreshold: Number(document.getElementById("warning-threshold").value || defaultConfig.warningThreshold),
+    criticalThreshold: Number(document.getElementById("critical-threshold").value || defaultConfig.criticalThreshold),
+    monitoredDomains: document
+      .getElementById("monitored-domains")
+      .value.split(",")
+      .map((domain) => domain.trim())
+      .filter(Boolean),
+  };
+}
+
+async function loadReportSource() {
+  config = readConfigFromForm();
+  if (!config.reportUrl) {
+    document.getElementById("source-status").textContent = "URL required";
+    return;
+  }
+
+  setLoading("Fetching health JSON source...");
+  document.getElementById("source-status").textContent = "Loading...";
+  try {
+    const response = await fetch(config.reportUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state = normalizeImportedData(await response.json());
+    localStorage.setItem("sf-monitoring-config", JSON.stringify(config));
+    document.getElementById("source-status").textContent = "Loaded";
+    render();
+  } catch (error) {
+    document.getElementById("source-status").textContent = "Load failed";
+    alert(`Could not load report source: ${error.message}`);
+  } finally {
+    setLoading("");
+  }
+}
+
 function normalizeImportedData(data) {
+  const sourceEvents = Array.isArray(data) ? data : data.events || data.healthEvents || data.records || [];
+  const normalizedEvents = sourceEvents.map((event) => normalizeEvent(event));
+
   if (Array.isArray(data)) {
     return {
       ...demoData,
       generatedAt: new Date().toLocaleString(),
-      status: deriveStatus(data),
-      events: data.map((event) => ({
-        severity: event.status || event.severity || "GREEN",
-        domain: event.domain || "Salesforce",
-        check: event.check || event.checkName || "custom_check",
-        title: event.title || event.message || event.check || "Imported health event",
-        count: Number(event.count || 0),
-        detail: event.detail || event.message || "Imported from health-events JSON.",
-      })),
+      status: deriveStatus(normalizedEvents),
+      events: normalizedEvents,
+      incidents: deriveIncidents(normalizedEvents, demoData.incidents),
     };
   }
+
+  const importedLimits = data.limits || data.orgLimits || data.limitUsage || demoData.limits;
+  const importedBusinessData = data.businessData || data.objects || data.recordsByObject || demoData.businessData;
 
   return {
     ...demoData,
     ...data,
-    status: data.status || deriveStatus(data.events || []),
-    events: data.events || demoData.events,
-    limits: data.limits || demoData.limits,
+    generatedAt: data.generatedAt || data.timestamp || data.runAt || new Date().toLocaleString(),
+    environment: data.environment || data.org || data.salesforceOrg || demoData.environment,
+    status: data.status || deriveStatus(normalizedEvents),
+    events: normalizedEvents.length ? normalizedEvents : demoData.events,
+    limits: importedLimits,
+    businessData: importedBusinessData,
+    incidents: deriveIncidents(normalizedEvents.length ? normalizedEvents : demoData.events, data.incidents || []),
+    trends: data.trends || data.metrics || demoData.trends,
   };
 }
 
+function normalizeEvent(event) {
+  const severity = normalizeSeverity(event.severity || event.status || event.level || "GREEN");
+  return {
+    severity,
+    domain: event.domain || event.object || event.sobject || "Salesforce",
+    check: event.check || event.checkName || event.metric || "custom_check",
+    title: event.title || event.message || event.check || "Imported health event",
+    count: Number(event.count ?? event.value ?? 0),
+    detail: event.detail || event.description || event.message || "Imported from health-events JSON.",
+    owner: event.owner || inferOwner(event.domain || event.object || "Salesforce"),
+    status: event.incidentStatus || event.statusLabel || (severity === "RED" ? "Open" : "Investigating"),
+  };
+}
+
+function normalizeSeverity(value) {
+  const severity = String(value || "GREEN").toUpperCase();
+  if (["RED", "CRITICAL", "ERROR", "FAILED"].includes(severity)) return "RED";
+  if (["YELLOW", "WARNING", "WARN", "DEGRADED"].includes(severity)) return "YELLOW";
+  return "GREEN";
+}
+
 function deriveStatus(events) {
-  if (events.some((event) => ["RED", "CRITICAL"].includes(event.status || event.severity))) {
+  if (events.some((event) => normalizeSeverity(event.status || event.severity) === "RED")) {
     return "RED";
   }
-  if (events.some((event) => ["YELLOW", "WARNING"].includes(event.status || event.severity))) {
+  if (events.some((event) => normalizeSeverity(event.status || event.severity) === "YELLOW")) {
     return "YELLOW";
   }
   return "GREEN";
 }
 
+function deriveIncidents(events, existingIncidents = []) {
+  const existingByTitle = new Map(existingIncidents.map((incident) => [incident.title, incident]));
+  const generated = events
+    .filter((event) => event.severity !== "GREEN" || Number(event.count || 0) > 0)
+    .map((event, index) => {
+      const existing = existingByTitle.get(event.title);
+      return {
+        id: existing?.id || `INC-${String(index + 1).padStart(3, "0")}`,
+        severity: event.severity,
+        title: event.title,
+        owner: existing?.owner || event.owner || inferOwner(event.domain),
+        status: existing?.status || (event.severity === "RED" ? "Open" : "Investigating"),
+      };
+    });
+
+  return generated.length ? generated : existingIncidents;
+}
+
+function inferOwner(domain) {
+  const normalizedDomain = String(domain || "").toLowerCase();
+  if (normalizedDomain.includes("opportunity") || normalizedDomain.includes("quote") || normalizedDomain.includes("order")) return "Sales Ops";
+  if (normalizedDomain.includes("product") || normalizedDomain.includes("pricebook")) return "CRM Ops";
+  if (normalizedDomain.includes("apex") || normalizedDomain.includes("api") || normalizedDomain.includes("integration")) return "Platform Ops";
+  if (normalizedDomain.includes("security") || normalizedDomain.includes("login")) return "Security Ops";
+  return "Ops";
+}
+
+function getFilteredEvents() {
+  return state.events.filter((event) => {
+    const searchTarget = `${event.title} ${event.domain} ${event.check} ${event.detail}`.toLowerCase();
+    const matchesSearch = !uiState.search || searchTarget.includes(uiState.search);
+    const matchesSeverity = uiState.severity === "ALL" || event.severity === uiState.severity;
+    const matchesDomain = uiState.domain === "ALL" || event.domain === uiState.domain;
+    return matchesSearch && matchesSeverity && matchesDomain;
+  });
+}
+
 function render() {
+  state.events = state.events.map(normalizeEvent);
+  state.incidents = deriveIncidents(state.events, state.incidents || []);
+  state.status = deriveStatus(state.events);
+
   const criticalCount = state.events.filter((event) => event.severity === "RED").length;
   const warningCount = state.events.filter((event) => event.severity === "YELLOW").length;
   const apiLimit = state.limits.find((limit) => limit.name === "DailyApiRequests") || {
@@ -279,11 +506,20 @@ function render() {
   document.getElementById("last-run").textContent = `Last run: ${state.generatedAt} | ${state.environment}`;
   document.getElementById("overall-status").textContent = state.status;
   document.querySelector(".status-panel.overall").dataset.status = state.status;
+  document.querySelector(".overall-check").textContent = state.status === "GREEN" ? "OK" : state.status === "YELLOW" ? "!" : "X";
   document.getElementById("critical-count").textContent = criticalCount;
   document.getElementById("warning-count").textContent = warningCount;
   document.getElementById("api-used").textContent = `${apiUsed}%`;
   document.getElementById("event-total").textContent = `${state.events.length} events`;
+  document.querySelector(".environment-value").textContent = state.environment || "unknown";
+  document.querySelector(".overall-check").textContent = state.status === "GREEN" ? "OK" : state.status === "YELLOW" ? "!" : "X";
+  document.querySelector(".api-gauge").style.background = `conic-gradient(var(--cloud) 0 ${apiUsed}%, #e2edf5 ${apiUsed}% 100%)`;
+  document.getElementById("event-total").textContent = `${getFilteredEvents().length}/${state.events.length} events`;
 
+  hydrateConfigForm();
+  renderFilters();
+  renderPrioritySummary(apiUsed);
+  renderVisuals(apiUsed);
   renderEvents();
   renderRecommendations();
   renderDomains();
@@ -339,9 +575,123 @@ function parseCsv(text) {
   );
 }
 
+function renderFilters() {
+  const domainFilter = document.getElementById("domain-filter");
+  const domains = [...new Set(state.events.map((event) => event.domain).filter(Boolean))].sort();
+  const current = uiState.domain;
+  domainFilter.innerHTML = [`<option value="ALL">All domains</option>`, ...domains.map((domain) => `<option value="${domain}">${domain}</option>`)].join("");
+  domainFilter.value = domains.includes(current) ? current : "ALL";
+}
+
+function renderPrioritySummary(apiUsed) {
+  const topEvent = [...state.events]
+    .filter((event) => event.severity !== "GREEN" || Number(event.count || 0) > 0)
+    .sort((left, right) => severityRank(right.severity) - severityRank(left.severity) || Number(right.count || 0) - Number(left.count || 0))[0];
+  const score = calculateRecoveryScore(apiUsed);
+  document.getElementById("recovery-score").textContent = `${score}% ready`;
+
+  const summary = topEvent
+    ? {
+        title: topEvent.severity === "RED" ? "Handle critical incident first" : "Review warning signal first",
+        detail: `${topEvent.domain}: ${topEvent.title}. ${topEvent.detail}`,
+        action: getRecommendedAction(topEvent),
+        severity: topEvent.severity,
+      }
+    : {
+        title: "No urgent action required",
+        detail: "All health signals are green. Keep scheduled checks, backup review, and deployment evidence current.",
+        action: "Run platform health before the next release window.",
+        severity: "GREEN",
+      };
+
+  document.getElementById("priority-summary").innerHTML = `
+    <div class="priority-card ${summary.severity}">
+      <span class="severity ${summary.severity}">${summary.severity}</span>
+      <div>
+        <strong>${summary.title}</strong>
+        <p>${summary.detail}</p>
+        <span>${summary.action}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderVisuals(apiUsed) {
+  const storageLimit = state.limits.find((limit) => /storage/i.test(limit.name)) || { max: 1, remaining: 1 };
+  const storageUsed = Math.max(0, Math.round(((storageLimit.max - storageLimit.remaining) / storageLimit.max) * 100));
+  const warningByDomain = state.events
+    .filter((event) => event.severity === "YELLOW" || event.severity === "RED")
+    .reduce((accumulator, event) => {
+      accumulator[event.domain] = (accumulator[event.domain] || 0) + 1;
+      return accumulator;
+    }, {});
+  const domainBars = Object.entries(warningByDomain)
+    .map(([domain, count]) => `<div><span>${domain}</span><strong>${count}</strong><div class="mini-bar"><i style="width:${Math.min(100, count * 34)}%"></i></div></div>`)
+    .join("");
+
+  document.getElementById("trend-grid").innerHTML = `
+    <div class="trend-card">
+      <span>API usage trend</span>
+      <strong>${apiUsed}%</strong>
+      <div class="trend-line api-trend"></div>
+    </div>
+    <div class="trend-card">
+      <span>Storage usage</span>
+      <strong>${storageUsed}%</strong>
+      <div class="bar-track"><div class="bar-fill" style="width:${storageUsed}%"></div></div>
+    </div>
+    <div class="trend-card">
+      <span>Warning by domain</span>
+      ${domainBars || `<p class="empty-copy">No warning domains right now.</p>`}
+    </div>
+    <div class="trend-card">
+      <span>Recovery readiness</span>
+      <strong>${calculateRecoveryScore(apiUsed)}%</strong>
+      <div class="readiness-meter"><i style="width:${calculateRecoveryScore(apiUsed)}%"></i></div>
+    </div>
+  `;
+}
+
+function calculateRecoveryScore(apiUsed) {
+  const redPenalty = state.events.filter((event) => event.severity === "RED").length * 20;
+  const yellowPenalty = state.events.filter((event) => event.severity === "YELLOW").length * 8;
+  const apiPenalty = apiUsed > config.warningThreshold ? 10 : 0;
+  const openPenalty = (state.incidents || []).filter((incident) => incident.status !== "Resolved").length * 3;
+  return Math.max(0, Math.min(100, 100 - redPenalty - yellowPenalty - apiPenalty - openPenalty));
+}
+
+function getApiUsed() {
+  const apiLimit = state.limits.find((limit) => limit.name === "DailyApiRequests") || { max: 1, remaining: 1 };
+  return Math.max(0, Math.round(((apiLimit.max - apiLimit.remaining) / apiLimit.max) * 100));
+}
+
+function severityRank(severity) {
+  return { GREEN: 1, YELLOW: 2, RED: 3 }[severity] || 0;
+}
+
+function getRecommendedAction(event) {
+  if (event.domain === "Product") return "Open Business Data, inspect Product2, then run Data Quality Scan.";
+  if (event.domain === "Opportunity") return "Ask Sales Ops to review stale opportunities before quote/order processing.";
+  if (event.severity === "RED") return "Open incident response and attach latest health JSON report.";
+  return "Assign owner and validate the latest workflow artifact.";
+}
+
 function renderEvents() {
   const list = document.getElementById("event-list");
-  list.innerHTML = state.events
+  const events = getFilteredEvents();
+  document.getElementById("event-total").textContent = `${events.length}/${state.events.length} events`;
+
+  if (!events.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <strong>No matching events</strong>
+        <span>Try clearing search or changing severity/domain filters.</span>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = events
     .map(
       (event) => `
         <div class="event-row">
@@ -361,13 +711,7 @@ function renderRecommendations() {
   const recommendations = state.events
     .filter((event) => event.severity !== "GREEN")
     .map((event) => {
-      const action =
-        event.domain === "Product"
-          ? "Review product master data and update ProductCode or mark invalid products inactive."
-          : event.domain === "Opportunity"
-            ? "Ask Sales Ops to update stale opportunities or close invalid records."
-            : "Open an operational review and attach the latest health report.";
-      return { title: event.title, action };
+      return { title: event.title, action: getRecommendedAction(event), severity: event.severity };
     });
 
   const rows = recommendations.length
@@ -378,6 +722,7 @@ function renderRecommendations() {
     .map(
       (item) => `
         <div class="recommendation">
+          <span class="severity ${item.severity || "GREEN"}">${item.severity || "GREEN"}</span>
           <strong>${item.title}</strong>
           <span>${item.action}</span>
         </div>
@@ -387,7 +732,7 @@ function renderRecommendations() {
 }
 
 function renderDomains() {
-  const domains = ["Product", "Opportunity", "Apex", "Security"];
+  const domains = config.monitoredDomains.length ? config.monitoredDomains : [...new Set(state.events.map((event) => event.domain))];
   document.getElementById("domain-grid").innerHTML = domains
     .map((domain) => {
       const events = state.events.filter((event) => event.domain === domain);
@@ -408,7 +753,7 @@ function renderLimits() {
   const rows = state.limits.map((limit) => {
     const used = Math.max(0, limit.max - limit.remaining);
     const usedPct = limit.max ? Math.round((used / limit.max) * 100) : 0;
-    const status = limit.max && limit.remaining / limit.max < 0.1 ? "RED" : limit.remaining / limit.max < 0.2 ? "YELLOW" : "GREEN";
+    const status = usedPct >= config.criticalThreshold ? "RED" : usedPct >= config.warningThreshold ? "YELLOW" : "GREEN";
     return `
       <tr>
         <td>${limit.name}</td>
@@ -486,9 +831,11 @@ function renderQuality() {
 }
 
 function renderIncidents() {
+  const openCount = state.incidents.filter((incident) => incident.status !== "Resolved").length;
+  document.getElementById("incident-summary").textContent = `${openCount} active`;
   document.getElementById("incident-table").innerHTML = `
     <table>
-      <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Owner</th><th>Status</th></tr></thead>
+      <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Owner</th><th>Status</th><th>Workflow</th></tr></thead>
       <tbody>
         ${state.incidents
           .map(
@@ -498,7 +845,14 @@ function renderIncidents() {
                 <td><span class="severity ${incident.severity}">${incident.severity}</span></td>
                 <td>${incident.title}</td>
                 <td>${incident.owner}</td>
-                <td>${incident.status}</td>
+                <td><span class="status-chip">${incident.status}</span></td>
+                <td>
+                  <div class="incident-actions">
+                    <button data-incident-id="${incident.id}" data-status="Open">Open</button>
+                    <button data-incident-id="${incident.id}" data-status="Investigating">Investigating</button>
+                    <button data-incident-id="${incident.id}" data-status="Resolved">Resolved</button>
+                  </div>
+                </td>
               </tr>
             `,
           )
@@ -506,6 +860,17 @@ function renderIncidents() {
       </tbody>
     </table>
   `;
+
+  document.querySelectorAll("[data-incident-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const incident = state.incidents.find((item) => item.id === button.dataset.incidentId);
+      if (!incident) return;
+      incident.status = button.dataset.status;
+      renderIncidents();
+      renderPrioritySummary(getApiUsed());
+      renderVisuals(getApiUsed());
+    });
+  });
 }
 
 function renderDeployments() {
@@ -565,9 +930,55 @@ function selectOpsAction(actionId) {
   document.getElementById("action-inputs").innerHTML = action.inputs.map((item) => `<li>${item}</li>`).join("");
   document.getElementById("action-checklist").innerHTML = action.checklist.map((item) => `<li>${item}</li>`).join("");
   document.getElementById("open-workflow").onclick = () => {
-    const url = `https://github.com/Ogifrn09/salesforce-cicd/actions/workflows/${action.workflow}`;
+    const url = `${config.workflowBaseUrl.replace(/\/$/, "")}/${action.workflow}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 }
 
+function buildReport() {
+  return {
+    generatedAt: new Date().toLocaleString(),
+    sourceGeneratedAt: state.generatedAt,
+    environment: state.environment,
+    status: state.status,
+    config,
+    events: state.events,
+    incidents: state.incidents,
+    limits: state.limits,
+    recoveryScore: calculateRecoveryScore(getApiUsed()),
+  };
+}
+
+function eventsToCsv(events) {
+  const columns = ["severity", "domain", "check", "title", "count", "detail", "owner"];
+  const rows = events.map((event) => columns.map((column) => csvCell(event[column])).join(","));
+  return [columns.join(","), ...rows].join("\n");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadFile(filename, contents, type) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function setLoading(message) {
+  const lastRun = document.getElementById("last-run");
+  if (message) {
+    document.body.dataset.loading = "true";
+    lastRun.textContent = message;
+  } else {
+    document.body.dataset.loading = "false";
+  }
+}
+
+hydrateConfigForm();
 render();

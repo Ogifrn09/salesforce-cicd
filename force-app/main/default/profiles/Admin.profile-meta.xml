@@ -708,6 +708,10 @@
     </userPermissions>
     <userPermissions>
         <enabled>true</enabled>
+        <name>AcceptInboundBundling</name>
+    </userPermissions>
+    <userPermissions>
+        <enabled>true</enabled>
         <name>AccessOrchestrationObjects</name>
     </userPermissions>
     <userPermissions>
@@ -1013,6 +1017,10 @@
     <userPermissions>
         <enabled>true</enabled>
         <name>GiveRecognitionBadge</name>
+    </userPermissions>
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>GrantOutboundBundling</name>
     </userPermissions>
     <userPermissions>
         <enabled>true</enabled>
